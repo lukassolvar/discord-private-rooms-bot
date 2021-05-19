@@ -162,8 +162,10 @@ class Database:
     def delete_private_room(self, room_id):
         statement = f"DELETE FROM active_rooms WHERE room_id = {int(room_id)}"
         if self.execute_statement(statement):
-            self.conn.commit()
-            return True
+            statement = f"DELETE FROM active_invitations WHERE room_id = {int(room_id)}"
+            if self.execute_statement(statement):
+                self.conn.commit()
+                return True
         return False
 
     def transfer_ownership(self, from_id, to_id):

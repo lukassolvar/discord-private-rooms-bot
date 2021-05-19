@@ -1,31 +1,16 @@
+from asyncio.tasks import sleep
 from logging import LoggerAdapter
 
 import discord
+from discord import guild
 from discord.ext import commands
 from discord.utils import *
 
-import os
-from dotenv import load_dotenv
+import json
 
 from lib.Logger import *
 from lib.Database import Database
 
-# Settings
-DEFAULT_DELETE_TIME = 60
-
-try:
-    load_dotenv()
-    GUILD_ID = int(os.getenv("GUILD_ID"))
-    CATEGORY_ID = int(os.getenv("CATEGORY_ID"))
-    ENTRY_ROOM_ID = int(os.getenv("ENTRY_ROOM_ID"))
-    COMMANDS_ROOM_ID = int(os.getenv("COMMANDS_ROOM_ID"))
-    AFK_ROOM_ID = int(os.getenv("AFK_ROOM_ID"))
-    logger.info("SUCCESS: Settings loaded")
-
-except:
-    logger.error("FAILED: Couldn't load settings")
-    exit()
-    
 class Rooms(commands.Cog):
 
     def __init__(self, bot):
@@ -33,17 +18,107 @@ class Rooms(commands.Cog):
         self.bot = bot
         self.db = Database()
 
+        self.GUILD_ID = None
+        self.CATEGORY_ID = None
+        self.ENTRY_ROOM_ID = None
+        self.COMMANDS_ROOM_ID = None
+        self.AFK_ROOM_ID = None
+
+    async def load_settings(self):
+        # Settings
+        self.DEFAULT_DELETE_TIME = 60
+
+        try:
+
+            with open("./assets/settings.json", "r", encoding="utf8") as settings:
+                data = json.load(settings)
+
+            self.GUILD_ID = data.get("GUILD_ID")
+            self.CATEGORY_ID = data.get("CATEGORY_ID")
+            self.ENTRY_ROOM_ID = data.get("ENTRY_ROOM_ID")
+            self.COMMANDS_ROOM_ID = data.get("COMMANDS_ROOM_ID")
+            self.AFK_ROOM_ID = data.get("AFK_ROOM_ID")
+
+            logger.info("SUCCESS: Settings loaded")
+
+        except:
+            logger.error("FAILED: Couldn't load settings")
+            exit()
+
+    async def init_module(self):
+        while True:
+            guild_id = input("Enter GUILD ID (Server ID) of your guild: ")
+            try:
+                guild_id = int(guild_id)
+            except:
+                print("Invalid ID! ID must only contain numbers! Try again!")
+                continue
+            guild = discord.utils.get(self.bot.guilds, id=guild_id)
+            if guild:
+                print("ID OK")
+            
+                try:
+                    print("Creating category")
+                    category = await guild.create_category("Private rooms")
+
+                    print("Creating commands channel")
+                    commands_channel = await guild.create_text_channel("🔐info", category=category)
+
+                    print("Creating entrance channel")
+                    entry_channel = await guild.create_voice_channel("Create room", category=category)
+
+                    print("Looking for AFK room")
+                    if guild.afk_channel:
+                        print("AFK channel found")
+                    else:
+                        print("No AFK channel found! Using default values")
+
+                except:
+                    print("ERROR! Check if bot has all necessary permissions to create channels!")
+                    exit()
+                
+                try:
+                    print("Saving configuration...")
+                    config = {
+                        "GUILD_ID": guild_id,
+                        "CATEGORY_ID": category.id,
+                        "ENTRY_ROOM_ID": entry_channel.id,
+                        "COMMANDS_ROOM_ID": commands_channel.id,
+                    }
+                    if guild.afk_channel:
+                        config["AFK_ROOM_ID"] = guild.afk_channel.id
+                    
+                    with open("./assets/settings.json", "w", encoding="utf8") as settings:
+                        json.dump(config, settings)
+
+                except:
+                    print("ERROR! Could not save configuration!")
+                    exit()
+
+                print("DONE! Starting Bot ...")
+                await asyncio.sleep(2)
+                break
+            else:
+                print("Looks like BOT has not joined the server yet! Try again after bot connects to the server.")
+                continue
+
     @commands.Cog.listener()
     async def on_ready(self):
+
+        await self.load_settings()
+
+        if self.GUILD_ID == 0:
+            await self.init_module()
+            await self.load_settings()
 
         try:
             logger.debug("Fetching server data")
 
-            self.guild = discord.utils.get(self.bot.guilds, id=GUILD_ID)
-            self.entry_room = discord.utils.get(self.guild.voice_channels, id=ENTRY_ROOM_ID)
-            self.commands_room = discord.utils.get(self.guild.channels, id=COMMANDS_ROOM_ID)
-            self.category = discord.utils.get(self.guild.channels, id=CATEGORY_ID)
-            self.afk_room = discord.utils.get(self.guild.channels, id=AFK_ROOM_ID)
+            self.guild = discord.utils.get(self.bot.guilds, id=self.GUILD_ID)
+            self.entry_room = discord.utils.get(self.guild.voice_channels, id=self.ENTRY_ROOM_ID)
+            self.commands_room = discord.utils.get(self.guild.channels, id=self.COMMANDS_ROOM_ID)
+            self.category = discord.utils.get(self.guild.channels, id=self.CATEGORY_ID)
+            self.afk_room = discord.utils.get(self.guild.channels, id=self.AFK_ROOM_ID)
         
         except:
             logger.error("FAILED: Couldn't fetch server data")
@@ -138,14 +213,14 @@ class Rooms(commands.Cog):
                 await channel.edit(overwrites=overwrite)
                 embed = discord.Embed(title=":unlock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Room unlocked!", inline=True, value="Anyone can join.")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
                 
                 logger.info(f"Unlocked room - {channel.name}")
             
             else:
                 embed = discord.Embed(title=":unlock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Room is already unlocked!", inline=True, value="Anyone can join.")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
 
@@ -175,14 +250,14 @@ class Rooms(commands.Cog):
                 await channel.edit(overwrites=overwrite)
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Room locked!", inline=True, value="Only members with invite can join")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
                 
                 logger.info(f"Locked room - {channel.name}")
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Room is already locked!", inline=True, value="Only members with invite can join")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
 
         await ctx.message.delete()
 
@@ -215,7 +290,7 @@ class Rooms(commands.Cog):
                 
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Member added!", inline=True, value=f"Room access was given to member {mentioned_member.mention}")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
 
                 embed = discord.Embed(title="✅ **Private rooms**", description=f"{channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Access given!", inline=True, value=f"You were given access to room!")
@@ -231,7 +306,7 @@ class Rooms(commands.Cog):
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Error!", inline=True, value=f"You can add or remove members only in locked room!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
     
@@ -265,9 +340,9 @@ class Rooms(commands.Cog):
                 
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Member removed!", inline=True, value="Members access has been revoked!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
                 
-                if mentioned_member.voice.channel == channel:
+                if mentioned_member.voice and mentioned_member.voice.channel == channel:
                     try:
                         await mentioned_member.edit(voice_channel=self.afk_room)
                     except:
@@ -278,7 +353,7 @@ class Rooms(commands.Cog):
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Error!", inline=True, value=f"You can add or remove members only in locked room!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
     
@@ -310,14 +385,14 @@ class Rooms(commands.Cog):
             
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {new_name}", color=discord.Color.magenta())
                 embed.add_field(name="Name changed!", inline=True, value="Name of the room was successfuly changed")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
             
                 logger.info(f"Room name changed - {new_name}")
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Error!", inline=True, value="Room name cannot contain any vulgarism!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
 
@@ -334,7 +409,7 @@ class Rooms(commands.Cog):
 
             embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
             embed.add_field(name="Removed!", inline=True, value="Room was successfuly deleted!")
-            await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+            await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
 
             self.db.delete_private_room(channel.id)
             await channel.delete(reason="Deleted by user")
@@ -428,7 +503,7 @@ class Rooms(commands.Cog):
             if self.db.is_already_owner(mentioned_member.id):
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name=":x: Denied!", inline=True, value="Member is already owner of the other private room!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
                 return
             
             else:
@@ -436,7 +511,7 @@ class Rooms(commands.Cog):
                 if not mentioned_member.voice or mentioned_member.voice.channel != channel:
                     embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
                     embed.add_field(name=":x: Denied!", inline=True, value="Member must be present in the room!")
-                    await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                    await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
                     return
                 
                 # Transfer ownership and set new name
@@ -448,7 +523,7 @@ class Rooms(commands.Cog):
                 # Send message to info room
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{mentioned_member.mention} - {channel.name}", color=discord.Color.magenta())
                 embed.add_field(name="Transfer successful!", inline=True, value=f"Member {mentioned_member.name} has become new owner of the room!")
-                await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
+                await self.commands_room.send(embed=embed, delete_after=self.DEFAULT_DELETE_TIME)
 
                 # Send message to new owner
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{channel.name}", color=discord.Color.magenta())
@@ -490,7 +565,7 @@ class Rooms(commands.Cog):
             try:
                 await self.commands_room.purge(limit=30, check=is_me)
             except:
-                logger.error("FAILED: Couldn't purge messages from commands room")
+                logger.debug("FAILED: Couldn't purge messages from commands room")
                 pass
     
             await asyncio.sleep(10)

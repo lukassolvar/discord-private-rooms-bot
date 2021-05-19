@@ -18,9 +18,9 @@ intents.reactions = True
 try:
     load_dotenv()
     TOKEN = str(os.getenv("TOKEN"))
-    logger.info("SUCCESS: Settings loaded")
+    logger.info("SUCCESS: Environment settings loaded")
 except:
-    logger.error("FAILED: Couldn't load settings")
+    logger.error("FAILED: Couldn't load environment settings")
     exit()
 
 class Bot():
