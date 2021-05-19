@@ -12,7 +12,6 @@ from lib.Rooms import Rooms
 
 intents = discord.Intents.default()
 intents.members = True
-#intents.presences = True
 intents.reactions = True
 
 try:
