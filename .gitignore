@@ -1,0 +1,4 @@
+.env
+bot.db
+lib/__pycache__
+log.log
