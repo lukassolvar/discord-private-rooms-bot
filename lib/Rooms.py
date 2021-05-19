@@ -87,28 +87,29 @@ class Rooms(commands.Cog):
             logger.info(f"Created private room {channel.name}")
     
     @commands.command()
-    async def generate_message(self, ctx):
+    async def message(self, ctx):
 
         if self.commands_room.permissions_for(ctx.author).administrator:
-            
-            embed = discord.Embed(title=":lock: Private rooms", description=f"Place to create your own private room!", color=discord.Color.magenta())
-            
-            embed.add_field(name=":eight_spoked_asterisk: Vytvorenie súkromnej miestnosti", inline=False, value="*Pre vytvorenie sa pripoj do miestnosti nižšie a bot ťa automaticky presunie do tvojej novej miestnosti*")
-            embed.add_field(name=":x: Zrušenie miestnosti", inline=False, value="`!delete`\n*Miestnosti sa taktiež rušia automaticky ak je daná miestnosť prázdna*")
-            embed.add_field(name=":abc: Premenovanie miesnosti", inline=False, value="`!rename meno`\n*Premenuje miestnosť*")
-            embed.add_field(name="🙋‍♂️ Pripojenie sa do miestnosti", inline=False, value="`!join @vlastník_miestnosti`\n*Pošle požiadavku pre pripojenie sa do miestnosti*")
-            embed.add_field(name=":unlock: Otvorenie miesnosti", inline=False, value="`!unlock`\n*Odomkne miestnosť pre každého bez nutnosti pozvánky*")
-            embed.add_field(name=":lock: Zavretie miesnosti", inline=False, value="`!lock`\n*Zamkne miestnosť. Ľudia s pozvánkou sa však budú môcť naďalej pripojiť*")
-            embed.add_field(name=":inbox_tray: Pridelenie prístupu", inline=False, value="`!add @používateľ` \n*Pridelí prístup do miestnosti pre označeného používateľa*")
-            embed.add_field(name=":outbox_tray: Zrušenie prístupu", inline=False, value="`!kick @používateľ`\n*Odoberie prístup do miestnosti pre označeného používateľa*\n")
-            embed.add_field(name=":crown: Zmena majiteľa", inline=False, value="`!transfer @používateľ`\n*Zmení majiteľa miestnosti*\n")
-            embed.add_field(name="💎 VIP", inline=False, value="`!vip`\n*Pridelí prístup všetkým VIP členom*\n")
-            
-            embed.set_footer(text="Pozn.: Miestnosti sú pri vytvorení zamknuté! Pre použitie príkazov musíš byť pripojený vo svojej miestnosti. Príkazy sú platné len ak ich zadá majiteľ miestnosti!")
-            
-            await self.commands_room.send(embed=embed)
-        
+            await self.generate_message()
+
         await ctx.message.delete()
+            
+    async def generate_message(self):
+        embed = discord.Embed(title=":lock: Private rooms", description=f"Place to create a new private room or join existing one!", color=discord.Color.magenta())
+            
+        embed.add_field(name=":eight_spoked_asterisk: Create a new room", inline=False, value="*Connect to the voice room below to create a new private room. Bot will move you automatically.*")
+        embed.add_field(name="🙋‍♂️ Joining the room", inline=False, value="`!join <@room_owner>`\n*Sends a request to join the room.*")
+        embed.add_field(name=":inbox_tray: Grant access", inline=False, value="`!add <@member>` \n*Grants access to member to join the room.*")
+        embed.add_field(name=":outbox_tray: Revoke access", inline=False, value="`!remove <@member>`\n*Will revoke access for member to join the room. This will also kick member from existing room.*\n")
+        embed.add_field(name=":unlock: Unlock a room", inline=False, value="`!unlock`\n*Unlocks the room for everyone without needing an invite to join.*")
+        embed.add_field(name=":lock: Lock a room", inline=False, value="`!lock`\n*Locks the room. Only users with invitation will be able to join. This won't remove existing members.*")
+        embed.add_field(name=":x: Delete a room", inline=False, value="`!delete`\n*Delets the room. Rooms are automatically deleted when detected as empty.*")
+        embed.add_field(name=":abc: Rename a room", inline=False, value="`!rename <name>`\n*Renames a room.*")
+        embed.add_field(name=":crown: Change owner", inline=False, value="`!transfer <@member>`\n*Transfers ownership to other member.*\n")
+        
+        embed.set_footer(text="Note: Rooms are locked by default! Commands are only valid when entered in this channel. Only owner of room can change settings and add/remove members.")
+        
+        await self.commands_room.send(embed=embed)
 
     @commands.command(aliases=['unlock'])
     async def open(self, ctx):
@@ -136,19 +137,19 @@ class Rooms(commands.Cog):
                 
                 await channel.edit(overwrites=overwrite)
                 embed = discord.Embed(title=":unlock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Miestnosť je odomknutá!", inline=True, value="Ktokoľvek sa môže pripojiť")
+                embed.add_field(name="Room unlocked!", inline=True, value="Anyone can join.")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
                 
                 logger.info(f"Unlocked room - {channel.name}")
             
             else:
                 embed = discord.Embed(title=":unlock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Miestnosť už je otvorená!", inline=True, value="Ktokoľvek sa môže pripojiť")
+                embed.add_field(name="Room is already unlocked!", inline=True, value="Anyone can join.")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
 
-    @commands.command(aliases=['private', 'lock'])
+    @commands.command(aliases=['lock'])
     async def close(self, ctx):
 
         member = ctx.author
@@ -173,19 +174,19 @@ class Rooms(commands.Cog):
                 self.db.close_room(channel.id)
                 await channel.edit(overwrites=overwrite)
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Miestnosť je zamknutá!", inline=True, value="Pripojiť sa môžu len ľudia s pozvánkou")
+                embed.add_field(name="Room locked!", inline=True, value="Only members with invite can join")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
                 
                 logger.info(f"Locked room - {channel.name}")
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Miestnosť uz je zamknutá!", inline=True, value="Pripojiť sa môžu len ľudia s pozvánkou")
+                embed.add_field(name="Room is already locked!", inline=True, value="Only members with invite can join")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
 
         await ctx.message.delete()
 
-    @commands.command(aliases=['add', 'allow'])
+    @commands.command(aliases=['add'])
     async def invite(self, ctx, mentioned_member:discord.Member):
         
         member = ctx.author
@@ -213,12 +214,12 @@ class Rooms(commands.Cog):
                 await channel.edit(overwrites=overwrite)
                 
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Používateľ pridaný!", inline=True, value=f"Používateľovi {mentioned_member.mention} bol pridelený prístup do miestnosti")
+                embed.add_field(name="Member added!", inline=True, value=f"Room access was given to member {mentioned_member.mention}")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
 
                 embed = discord.Embed(title="✅ **Private rooms**", description=f"{channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Prístup udelený!", inline=True, value=f"Bol ti udelený prístup do miestnosti")
-                embed.set_author(name="4R")
+                embed.add_field(name="Access given!", inline=True, value=f"You were given access to room!")
+                embed.set_author(name=f"{self.guild.name}")
                 
                 try:
                     await mentioned_member.send(embed=embed, delete_after=120)
@@ -229,12 +230,12 @@ class Rooms(commands.Cog):
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Chyba!", inline=True, value=f"Pridávať alebo odoberať uživateľov je možné len v zamknutej miestnosti!")
+                embed.add_field(name="Error!", inline=True, value=f"You can add or remove members only in locked room!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
     
-    @commands.command(aliases=['remove', 'kick'])
+    @commands.command(aliases=['remove'])
     async def uninvite(self, ctx, mentioned_member:discord.Member):
 
         member = ctx.author
@@ -263,7 +264,7 @@ class Rooms(commands.Cog):
                 await channel.edit(overwrites=overwrite)
                 
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Používateľ odobratý!", inline=True, value="Používateľovi bol odobratý prístup do miestnosti")
+                embed.add_field(name="Member removed!", inline=True, value="Members access has been revoked!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
                 
                 if mentioned_member.voice.channel == channel:
@@ -276,7 +277,7 @@ class Rooms(commands.Cog):
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Chyba!", inline=True, value=f"Pridávať alebo odoberať uživateľov je možné len v zamknutej miestnosti!")
+                embed.add_field(name="Error!", inline=True, value=f"You can add or remove members only in locked room!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
@@ -308,14 +309,14 @@ class Rooms(commands.Cog):
                 await channel.edit(name=new_name)
             
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {new_name}", color=discord.Color.magenta())
-                embed.add_field(name="Názov zmenený", inline=True, value="Názov miestnosti bol zmenený")
+                embed.add_field(name="Name changed!", inline=True, value="Name of the room was successfuly changed")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
             
                 logger.info(f"Room name changed - {new_name}")
             
             else:
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Chyba!", inline=True, value="Názov miestnosti nesmie obsahovať žiadne vulgarizmy!")
+                embed.add_field(name="Error!", inline=True, value="Room name cannot contain any vulgarism!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
         
         await ctx.message.delete()
@@ -332,7 +333,7 @@ class Rooms(commands.Cog):
                 await connected_member.edit(voice_channel=self.afk_room)
 
             embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-            embed.add_field(name="Odstránené!", inline=True, value="Miestnosť bola odstránená")
+            embed.add_field(name="Removed!", inline=True, value="Room was successfuly deleted!")
             await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
 
             self.db.delete_private_room(channel.id)
@@ -348,9 +349,9 @@ class Rooms(commands.Cog):
         await ctx.message.delete()
         
         if self.db.is_already_owner(mentioned_member.id):
-            embed = discord.Embed(title="🙋‍♂️ **Private rooms**", description=f"{member.name} sa chce pripojiť do tvojej miestnosti", color=discord.Color.magenta())
-            embed.add_field(name="Potvrdenie", inline=True, value="Ak súhlasíš klikni na reackiu 👍 v opačnom prípade na reakciu 👎")
-            embed.set_footer(text="Požiadavka vyprší po 2 minútach. Odmietnutia nie sú žiadateľom oznámené.")
+            embed = discord.Embed(title="🙋‍♂️ **Private rooms**", description=f"{member.name} wants to join the room!", color=discord.Color.magenta())
+            embed.add_field(name="Accept", inline=True, value="To approve request click on reaction 👍 or to deny request click on reaction 👎")
+            embed.set_footer(text="Request will expire in 2 minutes. If you deny the request, member won't be notified.")
             embed.set_author(name=f"{member.name}")
             
             try:
@@ -402,8 +403,8 @@ class Rooms(commands.Cog):
                     await channel.edit(overwrites=overwrite)
                     
                     embed = discord.Embed(title="✅ **Private rooms**", description=f"{channel.name}", color=discord.Color.magenta())
-                    embed.add_field(name="Prístup udelený!", inline=True, value=f"Bol ti udelený prístup do miestnosti")
-                    embed.set_author(name="4R")
+                    embed.add_field(name="Access granted!", inline=True, value=f"You were given access to the room!")
+                    embed.set_author(name=f"{self.guild.name}")
                     try:
                         await member.send(embed=embed, delete_after=120)
                     except:
@@ -426,7 +427,7 @@ class Rooms(commands.Cog):
             # Check if mentioned member is already owner of any channel
             if self.db.is_already_owner(mentioned_member.id):
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name=":x: Zamietnuté!", inline=True, value="Používateľ už je majiteľom jednej miestnosti!")
+                embed.add_field(name=":x: Denied!", inline=True, value="Member is already owner of the other private room!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
                 return
             
@@ -434,7 +435,7 @@ class Rooms(commands.Cog):
                 # Check if mentioned member is in the same channel as current owner
                 if not mentioned_member.voice or mentioned_member.voice.channel != channel:
                     embed = discord.Embed(title=":lock: **Private rooms**", description=f"{member.mention} - {channel.name}", color=discord.Color.magenta())
-                    embed.add_field(name=":x: Zamietnuté!", inline=True, value="Používateľ nie je prítomný v miestnosti!")
+                    embed.add_field(name=":x: Denied!", inline=True, value="Member must be present in the room!")
                     await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
                     return
                 
@@ -446,13 +447,13 @@ class Rooms(commands.Cog):
 
                 # Send message to info room
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{mentioned_member.mention} - {channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Zmena úspešná!", inline=True, value=f"Používateľ {mentioned_member.name} sa stal novým majiteľom miestnosti!")
+                embed.add_field(name="Transfer successful!", inline=True, value=f"Member {mentioned_member.name} has become new owner of the room!")
                 await self.commands_room.send(embed=embed, delete_after=DEFAULT_DELETE_TIME)
 
                 # Send message to new owner
                 embed = discord.Embed(title=":lock: **Private rooms**", description=f"{channel.name}", color=discord.Color.magenta())
-                embed.add_field(name="Práva pridelené!", inline=True, value=f"{member.name} ti daroval vlastníctvo miestnosti {channel.name}")
-                embed.set_author(name="4R")
+                embed.add_field(name="Rights transfered!", inline=True, value=f"{member.name} transfered ownership of the room {channel.name} to you!")
+                embed.set_author(name=f"{self.guild.name}")
                 try:
                     await mentioned_member.send(embed=embed, delete_after=120)
                 except:
