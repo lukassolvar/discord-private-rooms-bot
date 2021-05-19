@@ -107,9 +107,12 @@ class Rooms(commands.Cog):
 
         await self.load_settings()
 
+        fresh = False
+
         if self.GUILD_ID == 0:
             await self.init_module()
             await self.load_settings()
+            fresh = True
 
         try:
             logger.debug("Fetching server data")
@@ -123,6 +126,9 @@ class Rooms(commands.Cog):
         except:
             logger.error("FAILED: Couldn't fetch server data")
             exit()
+
+        if fresh:
+            await self.generate_message()
 
         game = discord.Game("Monitoring private rooms")
         await self.bot.change_presence(status=discord.Status.online, activity=game)
