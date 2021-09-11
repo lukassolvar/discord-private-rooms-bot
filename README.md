@@ -20,7 +20,3 @@ Bot is fully written in `Python` and uses following external libraries `discord`
 - ✅ Ownership transfer
 
 **User is required to paste `Bot token` into `.env` file and `Guild ID` in setup*
-
-## Screenshots and more detailed documentation TBA...
-
-`Private rooms` are only part of much bigger bot running on our community server! Feel free to join at https://discord.gg/gbvNB9mcPS (*Note that content of the server and bot functionality is mainly in Slovak language. Please be respectful to others!*)
